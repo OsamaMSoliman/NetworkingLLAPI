@@ -1,10 +1,8 @@
 ﻿using System;
 
 [Serializable]
-public abstract class Message
+public static class MessageEnums
 {
-	public OperationCode op = OperationCode.None;
-
 	public enum OperationCode : byte
 	{
 		None,
@@ -13,17 +11,29 @@ public abstract class Message
 		LoginRequest,
 		LoginResponse
 	}
+
+	public enum Status : byte
+	{
+		OK = 1,
+		InvalidEmail,
+		InvalidUsername,
+		EmailAlreayExists,
+		LoggedIn,
+	}
 }
 
 [Serializable]
-public class MsgRequest_CreateAccount : Message
+public abstract class Message { public MessageEnums.OperationCode op = MessageEnums.OperationCode.None; }
+
+[Serializable]
+public class RequestMsg_CreateAccount : Message
 {
 	public string Username { get; set; }
 	public string Password { get; set; }
 	public string Email { get; set; }
-	public MsgRequest_CreateAccount( string username , string password , string email )
+	public RequestMsg_CreateAccount(string username, string password, string email)
 	{
-		op = OperationCode.CreateAccountRequest;
+		op = MessageEnums.OperationCode.CreateAccountRequest;
 		this.Username = username;
 		this.Password = password;
 		this.Email = email;
@@ -31,41 +41,44 @@ public class MsgRequest_CreateAccount : Message
 }
 
 [Serializable]
-public class MsgResponse_CreateAccount : Message
+public class ResponseMsg_CreateAccount : Message
 {
-	public byte Status { get; set; }
-	public string Discremenator { get; set; }
-	public MsgResponse_CreateAccount( byte status , string discremenator )
+	public MessageEnums.Status Status { get; set; }
+	public ResponseMsg_CreateAccount(MessageEnums.Status status)
 	{
-		op = OperationCode.CreateAccountResponse;
+		op = MessageEnums.OperationCode.CreateAccountResponse;
 		this.Status = status;
-		this.Discremenator = discremenator;
 	}
 }
 
 [Serializable]
-public class MsgRequest_Login : Message
+public class RequestMsg_Login : Message
 {
 	public string EmailOrUsername { get; set; }
 	public string Password { get; set; }
 
-	public MsgRequest_Login( string EmailOrUsername , string password )
+	public RequestMsg_Login(string EmailOrUsername, string password)
 	{
-		op = OperationCode.LoginRequest;
+		op = MessageEnums.OperationCode.LoginRequest;
 		this.EmailOrUsername = EmailOrUsername;
 		this.Password = password;
 	}
 }
 
 [Serializable]
-public class MsgResponse_Login : Message
+public class ResponseMsg_Login : Message
 {
-	public byte Status { get; set; }
+	public MessageEnums.Status Status { get; set; }
+	public string Username { get; set; }
 	public string Discremenator { get; set; }
-	public MsgResponse_Login( byte status , string discremenator )
+	public string Token { get; set; }
+
+	public ResponseMsg_Login(MessageEnums.Status status, string username, string discremenator, string token)
 	{
-		op = OperationCode.LoginResponse;
+		op = MessageEnums.OperationCode.LoginResponse;
 		this.Status = status;
+		this.Username = username;
 		this.Discremenator = discremenator;
+		this.Token = token;
 	}
 }

@@ -12,6 +12,34 @@ public class Client : MonoBehaviour
 	private string SERVER_IP = "127.0.0.1";
 	private int BUFFER_SIZE = 1024;
 
+	#region Timeout
+	public event Action TimeOut;
+	private float timeOut = 10f;
+	private float t;
+	private bool waiting;
+	private void StartWaiting()
+	{
+		t = 0f;
+		waiting = true;
+	}
+	private void StopWaiting(bool success = false)
+	{
+		waiting = false;
+		if (!success)
+			TimeOut?.Invoke();
+	}
+	private void CheckTimeout()
+	{
+		if (waiting)
+		{
+			if (t <= timeOut)
+				t += Time.deltaTime;
+			else
+				StopWaiting(false);
+		}
+	}
+	#endregion
+
 	private bool isRunning;
 	private int theHostID;
 	private int theConnectionID;
@@ -23,12 +51,11 @@ public class Client : MonoBehaviour
 	public static Client Self { get; private set; }
 	private void Awake()
 	{
-		if ( Self == null )
+		if (Self == null)
 		{
 			Self = this;
 			DontDestroyOnLoad(gameObject);
-		}
-		else
+		} else
 		{
 			Destroy(gameObject);
 			return;
@@ -47,15 +74,15 @@ public class Client : MonoBehaviour
 		ConnectionConfig cc = new ConnectionConfig();
 		theChannelID = cc.AddChannel(QosType.Reliable);
 
-		HostTopology hostTopology = new HostTopology(cc , MAX_USERS_COUNT);
+		HostTopology hostTopology = new HostTopology(cc, MAX_USERS_COUNT);
 
-		theHostID = NetworkTransport.AddHost(hostTopology , 0);
+		theHostID = NetworkTransport.AddHost(hostTopology, 0); // removing the 0 gives an error,It's OK, I need a random port and 0 does that
 #if UNITY_WEBGL && !UNITY_EDITOR
 		connectionID = NetworkTransport.Connect(hostID , SERVER_IP , WEB_PORT , 0 , out error);
 #else
-		theConnectionID = NetworkTransport.Connect(theHostID , SERVER_IP , PORT , 0 , out error);
+		theConnectionID = NetworkTransport.Connect(theHostID, SERVER_IP, PORT, 0, out error);
 #endif
-		Debug.Log(string.Format("Normal Socket: {0} on Port {1}\nWebSocket: {2} on Port {3}" , theHostID , PORT , theWebHostID , theWebHostID));
+		Debug.Log(string.Format("Normal Socket: {0} on Port {1}\nWebSocket: {2} on Port {3}", theHostID, PORT, theWebHostID, theWebHostID));
 
 		isRunning = true;
 	}
@@ -69,28 +96,27 @@ public class Client : MonoBehaviour
 	private BinaryFormatter bf = new BinaryFormatter();
 	private void MessageUpdate()
 	{
-		if ( !isRunning ) return;
+		if (!isRunning)
+			return;
+		CheckTimeout();
 
-		int recHostId;
-		int connectionId;
-		int channelId;
 		byte[] buffer = new byte[BUFFER_SIZE];
-		int receivedDataSize;
 
-		NetworkEventType e = NetworkTransport.Receive(out recHostId , out connectionId , out channelId , buffer , BUFFER_SIZE , out receivedDataSize , out error);
-		switch ( e )
+		NetworkEventType e = NetworkTransport.Receive(out int recHostId, out int connectionId, out int channelId, buffer, BUFFER_SIZE, out int receivedDataSize, out error);
+		switch (e)
 		{
-			case NetworkEventType.Nothing: break;
+			case NetworkEventType.Nothing:
+				break;
 
 			case NetworkEventType.DataEvent:
 				Message m = (Message)bf.Deserialize(new MemoryStream(buffer));
-				OnDataReceive(m , recHostId , connectionId , channelId);
+				OnDataReceive(m, recHostId, connectionId, channelId);
 				break;
 			case NetworkEventType.ConnectEvent:
-				Debug.Log(string.Format("Connected, recHostId={0}, connectionId={1}, channelId={2}, receivedDataSize={3}, error={4}" , recHostId , connectionId , channelId , receivedDataSize , error));
+				Debug.Log(string.Format("Connected, recHostId={0}, connectionId={1}, channelId={2}, receivedDataSize={3}, error={4}", recHostId, connectionId, channelId, receivedDataSize, error));
 				break;
 			case NetworkEventType.DisconnectEvent:
-				Debug.Log(string.Format("Disconnected, recHostId={0}, connectionId={1}, channelId={2}, receivedDataSize={3}, error={4}" , recHostId , connectionId , channelId , receivedDataSize , error));
+				Debug.Log(string.Format("Disconnected, recHostId={0}, connectionId={1}, channelId={2}, receivedDataSize={3}, error={4}", recHostId, connectionId, channelId, receivedDataSize, error));
 				break;
 
 			default:
@@ -101,52 +127,64 @@ public class Client : MonoBehaviour
 	}
 
 
-
-
-	private void OnDataReceive( Message msg , int hostId , int connectionId , int channelId )
+	private void OnDataReceive(Message msg, int hostId, int connectionId, int channelId)
 	{
-		switch ( msg.op )
+		StopWaiting(true);
+		Debug.Log("Data: " + msg.op);
+		switch (msg.op)
 		{
-			case Message.OperationCode.None:
+			case MessageEnums.OperationCode.None:
 				Debug.Log("Unexpected OP : " + msg.op);
 				break;
-			case Message.OperationCode.CreateAccountResponse:
-				OnCreateAccountResponse((MsgResponse_CreateAccount)msg , hostId , connectionId , channelId);
+			case MessageEnums.OperationCode.CreateAccountResponse:
+				OnCreateAccountResponse((ResponseMsg_CreateAccount)msg, hostId, connectionId, channelId);
 				break;
-			case Message.OperationCode.LoginResponse:
-				OnLogInResponse((MsgResponse_Login)msg , hostId , connectionId , channelId);
+			case MessageEnums.OperationCode.LoginResponse:
+				OnLogInResponse((ResponseMsg_Login)msg, hostId, connectionId, channelId);
 				break;
 			default:
 				break;
 		}
 	}
 
-	public event Action<MsgResponse_CreateAccount> CreateAccountResponseReceived;
-	private void OnCreateAccountResponse( MsgResponse_CreateAccount msg , int hostId , int connectionId , int channelId )
-	{
-		CreateAccountResponseReceived?.Invoke(msg);
-	}
+	public event Action<ResponseMsg_CreateAccount> CreateAccountResponseReceived;
+	private void OnCreateAccountResponse(ResponseMsg_CreateAccount msg, int hostId, int connectionId, int channelId) => CreateAccountResponseReceived?.Invoke(msg);
 
-	public event Action<MsgResponse_Login> LogInResponseReceived;
-	private void OnLogInResponse( MsgResponse_Login msg , int hostId , int connectionId , int channelId )
-	{
-		LogInResponseReceived?.Invoke(msg);
-	}
+	public event Action<ResponseMsg_Login> LogInResponseReceived;
+	private void OnLogInResponse(ResponseMsg_Login msg, int hostId, int connectionId, int channelId) => LogInResponseReceived?.Invoke(msg);
 
-	private void SendToServer( Message msg )
+	private void SendToServer(Message msg)
 	{
 		byte[] buffer = new byte[BUFFER_SIZE];
 		MemoryStream ms = new MemoryStream(buffer);
-		bf.Serialize(ms , msg);
+		bf.Serialize(ms, msg);
 
-		NetworkTransport.Send(theHostID , theConnectionID , theChannelID , buffer , BUFFER_SIZE , out error);
+		NetworkTransport.Send(theHostID, theConnectionID, theChannelID, buffer, BUFFER_SIZE, out error);
+		StartWaiting();
 	}
 
 
 
-	public void CreateAccountRequest( string text , string text1 , string text2 ) => SendToServer(new MsgRequest_CreateAccount(text , text1 , text2));
+	public string CreateAccountRequest(string username, string password, string email)
+	{
+		if (!Utilities.IsUsername(username))
+			return "Invalid Username";
+		if (!Utilities.IsEmail(email))
+			return "Invalid Email";
+		if (string.IsNullOrEmpty(password))
+			return "Invalid password";
+		SendToServer(new RequestMsg_CreateAccount(username, Utilities.SHA256(password), email));
+		return null;
+	}
 
-
-	public void LogInRequest( string text , string text1 ) => SendToServer(new MsgRequest_Login(text , text1));
+	public string LogInRequest(string usernameOrEmail, string password)
+	{
+		if (!Utilities.IsUsernameAndDiscriminator(usernameOrEmail) && !Utilities.IsEmail(usernameOrEmail))
+			return "Invalid Username#Discriminator or Email";
+		if (string.IsNullOrEmpty(password))
+			return "Invalid password";
+		SendToServer(new RequestMsg_Login(usernameOrEmail, Utilities.SHA256(password)));
+		return null;
+	}
 
 }
