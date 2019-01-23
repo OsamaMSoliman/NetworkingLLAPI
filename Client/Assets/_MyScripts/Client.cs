@@ -3,9 +3,9 @@ using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 
-public class Client : MonoBehaviour
-{
+public class Client : MonoBehaviour {
 	private int MAX_USERS_COUNT = 100;
 	private int PORT = 2888;
 	private int WEB_PORT = 2555;
@@ -17,21 +17,17 @@ public class Client : MonoBehaviour
 	private float timeOut = 10f;
 	private float t;
 	private bool waiting;
-	private void StartWaiting()
-	{
+	private void StartWaiting() {
 		t = 0f;
 		waiting = true;
 	}
-	private void StopWaiting(bool success = false)
-	{
+	private void StopWaiting(bool success = false) {
 		waiting = false;
 		if (!success)
 			TimeOut?.Invoke();
 	}
-	private void CheckTimeout()
-	{
-		if (waiting)
-		{
+	private void CheckTimeout() {
+		if (waiting) {
 			if (t <= timeOut)
 				t += Time.deltaTime;
 			else
@@ -46,17 +42,16 @@ public class Client : MonoBehaviour
 	private byte theChannelID;
 	private int theWebHostID;
 	private byte error;
+	public Info Info { get; set; }
+	private string Token { get; set; }
 
 	#region Singlton
 	public static Client Self { get; private set; }
-	private void Awake()
-	{
-		if (Self == null)
-		{
+	private void Awake() {
+		if (Self == null) {
 			Self = this;
 			DontDestroyOnLoad(gameObject);
-		} else
-		{
+		} else {
 			Destroy(gameObject);
 			return;
 		}
@@ -67,8 +62,7 @@ public class Client : MonoBehaviour
 	private void Start() => Init();
 	private void Update() => MessageUpdate();
 
-	private void Init()
-	{
+	private void Init() {
 		NetworkTransport.Init();
 
 		ConnectionConfig cc = new ConnectionConfig();
@@ -87,15 +81,13 @@ public class Client : MonoBehaviour
 		isRunning = true;
 	}
 
-	private void Shutdown()
-	{
+	private void Shutdown() {
 		isRunning = false;
 		NetworkTransport.Shutdown();
 	}
 
 	private BinaryFormatter bf = new BinaryFormatter();
-	private void MessageUpdate()
-	{
+	private void MessageUpdate() {
 		if (!isRunning)
 			return;
 		CheckTimeout();
@@ -103,8 +95,7 @@ public class Client : MonoBehaviour
 		byte[] buffer = new byte[BUFFER_SIZE];
 
 		NetworkEventType e = NetworkTransport.Receive(out int recHostId, out int connectionId, out int channelId, buffer, BUFFER_SIZE, out int receivedDataSize, out error);
-		switch (e)
-		{
+		switch (e) {
 			case NetworkEventType.Nothing:
 				break;
 
@@ -127,20 +118,21 @@ public class Client : MonoBehaviour
 	}
 
 
-	private void OnDataReceive(Message msg, int hostId, int connectionId, int channelId)
-	{
+
+
+	#region Receive Data
+	private void OnDataReceive(Message msg, int hostId, int connectionId, int channelId) {
 		StopWaiting(true);
 		Debug.Log("Data: " + msg.op);
-		switch (msg.op)
-		{
+		switch (msg.op) {
 			case MessageEnums.OperationCode.None:
 				Debug.Log("Unexpected OP : " + msg.op);
 				break;
 			case MessageEnums.OperationCode.CreateAccountResponse:
-				OnCreateAccountResponse((ResponseMsg_CreateAccount)msg, hostId, connectionId, channelId);
+				OnCreateAccountResponse((ResponseMsg_CreateAccount)msg);
 				break;
 			case MessageEnums.OperationCode.LoginResponse:
-				OnLogInResponse((ResponseMsg_Login)msg, hostId, connectionId, channelId);
+				OnLogInResponse((ResponseMsg_Login)msg, connectionId);
 				break;
 			default:
 				break;
@@ -148,13 +140,22 @@ public class Client : MonoBehaviour
 	}
 
 	public event Action<ResponseMsg_CreateAccount> CreateAccountResponseReceived;
-	private void OnCreateAccountResponse(ResponseMsg_CreateAccount msg, int hostId, int connectionId, int channelId) => CreateAccountResponseReceived?.Invoke(msg);
+	private void OnCreateAccountResponse(ResponseMsg_CreateAccount msg) => CreateAccountResponseReceived?.Invoke(msg);
 
 	public event Action<ResponseMsg_Login> LogInResponseReceived;
-	private void OnLogInResponse(ResponseMsg_Login msg, int hostId, int connectionId, int channelId) => LogInResponseReceived?.Invoke(msg);
+	private void OnLogInResponse(ResponseMsg_Login msg, int connectionId) {
+		if (msg.Status == MessageEnums.Status.LoggedIn) {
+			Info = new Info(msg, connectionId);
+			Info.Email = msg.Email;
+			Token = msg.Token;
+			SceneManager.LoadSceneAsync("Hub");
+		}
+		LogInResponseReceived?.Invoke(msg);
+	}
+	#endregion
 
-	private void SendToServer(Message msg)
-	{
+	#region Send Request
+	private void SendToServer(Message msg) {
 		byte[] buffer = new byte[BUFFER_SIZE];
 		MemoryStream ms = new MemoryStream(buffer);
 		bf.Serialize(ms, msg);
@@ -163,10 +164,7 @@ public class Client : MonoBehaviour
 		StartWaiting();
 	}
 
-
-
-	public string CreateAccountRequest(string username, string password, string email)
-	{
+	public string RequestCreateAccount(string username, string password, string email) {
 		if (!Utilities.IsUsername(username))
 			return "Invalid Username";
 		if (!Utilities.IsEmail(email))
@@ -177,9 +175,10 @@ public class Client : MonoBehaviour
 		return null;
 	}
 
-	public string LogInRequest(string usernameOrEmail, string password)
-	{
-		if (!Utilities.IsUsernameAndDiscriminator(usernameOrEmail) && !Utilities.IsEmail(usernameOrEmail))
+	public string RequestLogIn(string usernameOrEmail, string password) {
+		Utilities.StringTpye x = Utilities.TestString(usernameOrEmail);
+		if (x == Utilities.StringTpye.Undefined || x == Utilities.StringTpye.Username)
+			//if (!Utilities.IsUsernameAndDiscriminator(usernameOrEmail) && !Utilities.IsEmail(usernameOrEmail))
 			return "Invalid Username#Discriminator or Email";
 		if (string.IsNullOrEmpty(password))
 			return "Invalid password";
@@ -187,4 +186,28 @@ public class Client : MonoBehaviour
 		return null;
 	}
 
+
+	public void RequestAddRemoveFollow(bool unFollow, string UsernameDiscriminatorOrEmail) {
+		Utilities.StringTpye x = Utilities.TestString(UsernameDiscriminatorOrEmail);
+		switch (x) {
+			case Utilities.StringTpye.UsernameAndDiscriminator:
+				if (UsernameDiscriminatorOrEmail != Info.Username + '#' + Info.Discriminator)
+					SendToServer(new RequestMsg_FollowAddRemove(unFollow, Token, UsernameDiscriminatorOrEmail, false));
+				break;
+			case Utilities.StringTpye.Email:
+				if (UsernameDiscriminatorOrEmail != Info.Email)
+					SendToServer(new RequestMsg_FollowAddRemove(unFollow, Token, UsernameDiscriminatorOrEmail, true));
+				break;
+
+			default:
+			case Utilities.StringTpye.Username:
+			case Utilities.StringTpye.Undefined:
+				//TODO: ERROR!
+				break;
+		}
+	}
+
+
+	public void RequestListOfFollows() => SendToServer(new RequestMsg_FollowList(Token));
+	#endregion
 }
