@@ -22,4 +22,8 @@ public class Info {
 		this.Discriminator = discriminator;
 		this.Status = status;
 	}
+
+	public override string ToString() {
+		return string.Format("ActiveConnection: {0}, Username: {1}, Discriminator: {2}, Email: {3}, Status: {4}", ActiveConnection, Username, Discriminator, Email, Status);
+	}
 }

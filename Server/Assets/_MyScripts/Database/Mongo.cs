@@ -49,6 +49,8 @@ public class Mongo {
 	public Info InsertFollowership(string token, string username, string discriminator) { return InsertFollowership(token, SelectAccount(username, discriminator)); }
 
 	private Info InsertFollowership(string token, Account account) {
+		if (account == null)
+			return null;
 		Followership followership = new Followership(new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id), new MongoDBRef(ACCOUNTS_COLLECTION_NAME, account._id));
 		if (followership.Initiator == followership.Target)
 			return null;
@@ -86,10 +88,21 @@ public class Mongo {
 
 	public Account SelectAccount(string Username, string Discriminator) { return accountsCollection.FindOne(Query.And(Query<Account>.EQ(account => account.Username, Username), Query<Account>.EQ(account => account.Discriminator, Discriminator))); }
 	public Account SelectAccount(string withThis, System.Linq.Expressions.Expression<System.Func<Account, string>> byThis) { return accountsCollection.FindOne(Query<Account>.EQ(byThis, withThis)); }
-
 	#endregion
 
 	#region Delete
+	public string DeleteFollowerShip(string token, string email) { return DeleteFollowerShip(token, SelectAccount(email, a => a.Email)); }
 
+	public string DeleteFollowerShip(string token, string username, string discriminator) { return DeleteFollowerShip(token, SelectAccount(username, discriminator)); }
+
+	private string DeleteFollowerShip(string token, Account account) {
+		if (account == null)
+			return "NONE";
+		var Initiator = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id);
+		var Target = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, account._id);
+		Followership followership = followershippCollection.FindOne(Query.And(Query<Followership>.EQ(f => f.Initiator, Initiator), Query<Followership>.EQ(f => f.Target, Target)));
+		followershippCollection.Remove(Query<Followership>.EQ(f => f._id, followership._id));
+		return followership.ToString();
+	}
 	#endregion
 }

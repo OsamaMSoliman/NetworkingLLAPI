@@ -10,4 +10,6 @@ public class Followership {
 		this.Initiator = initiator;
 		this.Target = target;
 	}
+
+	public override string ToString() { return _id + " : " + Initiator.Id + " > " + Target.Id; }
 }

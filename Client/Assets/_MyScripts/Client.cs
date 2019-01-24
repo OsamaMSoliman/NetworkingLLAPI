@@ -134,10 +134,16 @@ public class Client : MonoBehaviour {
 			case MessageEnums.OperationCode.LoginResponse:
 				OnLogInResponse((ResponseMsg_Login)msg, connectionId);
 				break;
+			case MessageEnums.OperationCode.FollowAddRemoveResponse:
+				OnFollowResponse((ResponseMsg_FollowAddRemove)msg);
+				break;
 			default:
 				break;
 		}
 	}
+
+	public event Action<ResponseMsg_FollowAddRemove> FollowResponseReceived;
+	private void OnFollowResponse(ResponseMsg_FollowAddRemove msg) => FollowResponseReceived?.Invoke(msg);
 
 	public event Action<ResponseMsg_CreateAccount> CreateAccountResponseReceived;
 	private void OnCreateAccountResponse(ResponseMsg_CreateAccount msg) => CreateAccountResponseReceived?.Invoke(msg);

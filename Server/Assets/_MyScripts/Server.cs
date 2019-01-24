@@ -122,7 +122,12 @@ public class Server : MonoBehaviour {
 
 	private void ResponseFollowAddRemove(RequestMsg_FollowAddRemove msg, int hostId, int connectionId) {
 		if (msg.Unfollow) {
-
+			if (msg.IsEmail) {
+				print(mongo.DeleteFollowerShip(msg.Token, msg.UsernameDiscriminatorOrEmail));
+			} else {
+				string[] data = msg.UsernameDiscriminatorOrEmail.Split(new char[] { '#' }, System.StringSplitOptions.RemoveEmptyEntries);
+				print(mongo.DeleteFollowerShip(msg.Token, data[0], data[1]));
+			}
 		} else {
 			Info info = null;
 			if (msg.IsEmail) {
