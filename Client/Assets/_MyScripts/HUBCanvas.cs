@@ -10,48 +10,54 @@ public class HUBCanvas : MonoBehaviour {
 	[SerializeField] private TMP_InputField input;
 	[SerializeField] private Transform followListContent;
 
-	private Action<ResponseMsg_FollowAddRemove> frr;
-	private Action<ResponseMsg_FollowList> flrr;
-
-	private List<Info> followInfoList;
-
-	private void Start() {
-		followInfoList = new List<Info>();
-		this.userInfo.text = Client.Self.Info.Username + "#" + Client.Self.Info.Discriminator;
-		Client.Self.RequestListOfFollows();
-		flrr = msg => OnFollowListResponse(msg);
-		Client.Self.FollowListResponseReceived += flrr;
-		frr = msg => OnFollowResponse(msg);
-		Client.Self.FollowResponseReceived += frr;
+	private struct Follow {
+		public PublicInfo info;
+		public GameObject goRef;
 	}
 
-	private void OnDestroy() => Client.Self.FollowResponseReceived -= frr;
+	private Dictionary<string, Follow> followInfoDic;
+
+	private void Start() {
+		followInfoDic = new Dictionary<string, Follow>();
+		this.userInfo.text = Client.Self.Info.Username + "#" + Client.Self.Info.Discriminator;
+		Client.Self.RequestListOfFollows();
+		Client.Self.FollowListResponseReceived += OnFollowListResponse;
+		Client.Self.FollowResponseReceived += OnFollowResponse;
+		Client.Self.FollowUpdateResponseReceived += FollowUpdate;
+	}
+
+	private void OnDestroy() => Client.Self.FollowResponseReceived -= OnFollowResponse;
 
 	private void OnFollowResponse(ResponseMsg_FollowAddRemove msg) => AddToFollowList(msg.Follow);
 	private void OnFollowListResponse(ResponseMsg_FollowList msg) {
 		foreach (var follow in msg.Follows) {
 			AddToFollowList(follow);
 		}
-		Client.Self.FollowListResponseReceived -= flrr;
+		Client.Self.FollowListResponseReceived -= OnFollowListResponse;
 	}
 
-	private void AddToFollowList(Info follow) {
+	private void FollowUpdate(ResponseMsg_FollowUpdate msg) {
+		//TODO: update the UI
+	}
+
+
+	private void AddToFollowList(PublicInfo follow) {
 		if (follow != null) {
 			GameObject go = Instantiate(FollowerPrefab, followListContent);
 			//the name
 			go.GetComponentInChildren<TextMeshProUGUI>().SetText(string.Format("{0}#{1}", follow.Username, follow.Discriminator));
 			//the online status
-			go.GetComponentInChildren<Image>().color = follow.Status == MessageEnums.Status.LoggedIn ? Color.green : Color.grey;
+			go.GetComponentInChildren<Image>().color = follow.Status == MessageEnums.AccountStatus.Online ? Color.green : Color.grey;
 			//the delete button 
 			go.GetComponentInChildren<Button>().onClick.AddListener(delegate {
 				Debug.Log("Unfollow: " + follow.Username + "#" + follow.Discriminator);
 				Client.Self.RequestAddRemoveFollow(true, follow.Username + "#" + follow.Discriminator, Utilities.StringTpye.UsernameAndDiscriminator);
 				//TODO: run and check it's working fine
 				print(follow.ToString());
-				followInfoList.Remove(follow);
+				followInfoDic.Remove(follow.Email);
 				Destroy(go);
 			});
-			followInfoList.Add(follow);
+			followInfoDic[follow.Email] = new Follow { info = follow, goRef = go };
 		}
 	}
 
@@ -59,7 +65,7 @@ public class HUBCanvas : MonoBehaviour {
 		switch (Utilities.TestString(input.text)) {
 			case Utilities.StringTpye.Email:
 				//TODO: show error
-				if (existsAlready(input.text, i => i.Email))
+				if (existsAlready(input.text))
 					Debug.Log("Error Already exists!");
 				else if (CheckAddingSelf(input.text, i => i.Email))
 					Debug.Log("Error Trying to add self!");
@@ -84,14 +90,15 @@ public class HUBCanvas : MonoBehaviour {
 		}
 	}
 
-	private bool existsAlready(string input, Func<Info, string> func) {
-		foreach (var info in followInfoList) {
-			if (input == func(info))
+	private bool existsAlready(string input, Func<PublicInfo, string> func) {
+		foreach (var info in followInfoDic.Values)
+			if (input == func(info.info))
 				return true;
-		}
 		return false;
 	}
 
-	private bool CheckAddingSelf(string input, Func<Info, string> func) => input == func(Client.Self.Info);
+	private bool existsAlready(string email) => followInfoDic.ContainsKey(email);
+
+	private bool CheckAddingSelf(string input, Func<PublicInfo, string> func) => input == func(Client.Self.Info);
 
 }

@@ -23,7 +23,7 @@ public class LobbyPanel : MonoBehaviour {
 		cg = GetComponent<CanvasGroup>();
 
 		ocar = msg => OnCreateAccountResponse(msg.Status == MessageEnums.Status.OK, msg.Status.ToString());
-		olr = msg => OnLogInResponse(msg.Status == MessageEnums.Status.LoggedIn, msg.Status.ToString());
+		olr = msg => OnLogInResponse(msg.Status == MessageEnums.Status.OK, msg.Status.ToString());
 		timeout = delegate { cg.interactable = true; infoText.text = "Timeout!"; };
 
 		Client.Self.CreateAccountResponseReceived += ocar;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 
 //NOTE: A lot of C# 4 code had to be downgraded to C# 3, ALWAYS modify from the Server side!
@@ -16,21 +17,26 @@ public static class MessageEnums {
 		FollowAddRemoveResponse,
 		FollowListRequest,
 		FollowListResponse,
+		FollowUpdateResponse,
 	}
 
 
-	//TODO: turn status into a bool Success or Failed
 	//TODO: check all the Status msgs in both Server how are they assigned and Client how are they checked
 	public enum Status : byte {
-		OK = 1,
+		ERROR, // TODO: this is a placeholder, all errors should be identified in the last version
+		OK,
 		InvalidEmail,
 		InvalidUsername,
 		EmailAlreayExists,
-		LoggedIn,
 		FollowAdded,
 		FollowRemoved,
-		FollowListUpdated,
-		LoggedOut,
+	}
+
+	public enum AccountStatus : byte {
+		Offline,
+		Online,
+		Playing,
+		AFK,
 	}
 }
 
@@ -112,9 +118,9 @@ public class RequestMsg_FollowAddRemove : Message {
 [Serializable]
 public class ResponseMsg_FollowAddRemove : Message {
 	public MessageEnums.Status Status { get; set; }
-	public Info Follow { get; private set; }
+	public PublicInfo Follow { get; private set; }
 
-	public ResponseMsg_FollowAddRemove(MessageEnums.Status status, Info follow) {
+	public ResponseMsg_FollowAddRemove(MessageEnums.Status status, PublicInfo follow) {
 		op = MessageEnums.OperationCode.FollowAddRemoveResponse;
 		this.Status = status;
 		this.Follow = follow;
@@ -135,11 +141,21 @@ public class RequestMsg_FollowList : Message {
 [Serializable]
 public class ResponseMsg_FollowList : Message {
 	public MessageEnums.Status Status { get; set; }
-	public System.Collections.Generic.List<Info> Follows { get; private set; }
+	public List<PublicInfo> Follows { get; private set; }
 
-	public ResponseMsg_FollowList(MessageEnums.Status status, System.Collections.Generic.List<Info> follow) {
+	public ResponseMsg_FollowList(MessageEnums.Status status, List<PublicInfo> follows) {
 		op = MessageEnums.OperationCode.FollowListResponse;
 		this.Status = status;
-		this.Follows = follow;
+		this.Follows = follows;
+	}
+}
+
+[Serializable]
+public class ResponseMsg_FollowUpdate : Message {
+	public PublicInfo Follow { get; private set; }
+
+	public ResponseMsg_FollowUpdate(PublicInfo follow) {
+		op = MessageEnums.OperationCode.FollowUpdateResponse;
+		this.Follow = follow;
 	}
 }

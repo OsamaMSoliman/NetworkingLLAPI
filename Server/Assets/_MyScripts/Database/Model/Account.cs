@@ -12,14 +12,17 @@
 	public string Username { get; private set; }
 	public string Password { get; private set; }
 	public string Email { get; private set; } // unique
-	public string Discriminator { get; private set; } // unique
+	public string Discriminator { get; private set; } // unique (TODO: make it unique when combined with username)
 
-	public int ActiveConnection { get; set; }
-	public MessageEnums.Status Status { get; set; } // not sure yet about this
+	public int HostId { get; set; }
+	public int ConnectionId { get; set; }
+	public MessageEnums.AccountStatus Status { get; set; }
 	public string Token { get; set; }
-	public System.DateTime LastLogin { get; set; }
+	public System.DateTime LastSeen { get; set; }
 
 
-	public Info GetInfo() { return new Info(this.ActiveConnection, this.Username, this.Discriminator, this.Email, this.Status); }
+	public PublicInfo GetPublicInfo() { return new PublicInfo(this.Username, this.Discriminator, this.Email, this.Status); }
+
+	public override string ToString() { return string.Format("Username: {0}, Discriminator: {1}, Email: {2}, Status: {3}", Username, Discriminator, Email, Status); }
 
 }

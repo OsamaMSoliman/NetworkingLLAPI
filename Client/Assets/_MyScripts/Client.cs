@@ -42,7 +42,7 @@ public class Client : MonoBehaviour {
 	private byte theChannelID;
 	private int theWebHostID;
 	private byte error;
-	public Info Info { get; set; }
+	public PublicInfo Info { get; set; }
 	private string Token { get; set; }
 
 	#region Singlton
@@ -72,7 +72,7 @@ public class Client : MonoBehaviour {
 
 		theHostID = NetworkTransport.AddHost(hostTopology, 0); // removing the 0 gives an error,It's OK, I need a random port and 0 does that
 #if UNITY_WEBGL && !UNITY_EDITOR
-		connectionID = NetworkTransport.Connect(hostID , SERVER_IP , WEB_PORT , 0 , out error);
+		theConnectionID = NetworkTransport.Connect(theWebHostID , SERVER_IP , WEB_PORT , 0 , out error);
 #else
 		theConnectionID = NetworkTransport.Connect(theHostID, SERVER_IP, PORT, 0, out error);
 #endif
@@ -140,6 +140,9 @@ public class Client : MonoBehaviour {
 			case MessageEnums.OperationCode.FollowListResponse:
 				OnFollowListResponse((ResponseMsg_FollowList)msg);
 				break;
+			case MessageEnums.OperationCode.FollowUpdateResponse:
+				OnFollowUpdateRespons((ResponseMsg_FollowUpdate)msg);
+				break;
 			default:
 				break;
 		}
@@ -151,13 +154,16 @@ public class Client : MonoBehaviour {
 	public event Action<ResponseMsg_FollowList> FollowListResponseReceived;
 	private void OnFollowListResponse(ResponseMsg_FollowList msg) => FollowListResponseReceived?.Invoke(msg);
 
+	public event Action<ResponseMsg_FollowUpdate> FollowUpdateResponseReceived;
+	private void OnFollowUpdateRespons(ResponseMsg_FollowUpdate msg) => FollowUpdateResponseReceived?.Invoke(msg);
+
 	public event Action<ResponseMsg_CreateAccount> CreateAccountResponseReceived;
 	private void OnCreateAccountResponse(ResponseMsg_CreateAccount msg) => CreateAccountResponseReceived?.Invoke(msg);
 
 	public event Action<ResponseMsg_Login> LogInResponseReceived;
 	private void OnLogInResponse(ResponseMsg_Login msg, int connectionId) {
-		if (msg.Status == MessageEnums.Status.LoggedIn) {
-			Info = new Info(msg, connectionId);
+		if (msg.Status == MessageEnums.Status.OK) {
+			Info = new PublicInfo(msg, connectionId);
 			Info.Email = msg.Email;
 			Token = msg.Token;
 			SceneManager.LoadSceneAsync("Hub");

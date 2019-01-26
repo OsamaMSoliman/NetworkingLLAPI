@@ -80,6 +80,7 @@ public class Server : MonoBehaviour {
 				Debug.Log(string.Format("Connected, recHostId={0}, connectionId={1}, channelId={2}, receivedDataSize={3}, error={4}", recHostId, connectionId, channelId, receivedDataSize, error));
 				break;
 			case NetworkEventType.DisconnectEvent:
+				OnDisconnected(recHostId, connectionId);
 				Debug.Log(string.Format("Disconnected, recHostId={0}, connectionId={1}, channelId={2}, receivedDataSize={3}, error={4}", recHostId, connectionId, channelId, receivedDataSize, error));
 				break;
 
@@ -112,12 +113,14 @@ public class Server : MonoBehaviour {
 		Debug.Log(string.Format("{0},{1}", msg.EmailOrUsername, msg.Password));
 		string[] data = msg.EmailOrUsername.Split('#');
 		string token = Utilities.GenerateRandom(64);
-		Account account = mongo.LogIn(msg.EmailOrUsername, msg.Password, connectionId, token);
+		Account account = mongo.LogIn(msg.EmailOrUsername, msg.Password, hostId, connectionId, token);
+		print(">>>>>>>>> " + account.ToString());
 		if (account == null)
-			return;
-		ResponseMsg_Login response = new ResponseMsg_Login(account.Status, account.Username, account.Discriminator, account.Token);
+			return; // TODO: Must return a response
+		ResponseMsg_Login response = new ResponseMsg_Login(MessageEnums.Status.OK, account.Username, account.Discriminator, account.Token);
 		response.Email = account.Email;
 		SendToClient(hostId, connectionId, response);
+		UpdateFollowers(account.GetPublicInfo());
 	}
 
 	private void ResponseFollowAddRemove(RequestMsg_FollowAddRemove msg, int hostId, int connectionId) {
@@ -129,7 +132,7 @@ public class Server : MonoBehaviour {
 				mongo.DeleteFollowerShip(msg.Token, data[0], data[1]);
 			}
 		} else {
-			Info info = null;
+			PublicInfo info = null;
 			if (msg.IsEmail) {
 				info = mongo.InsertFollowership(msg.Token, msg.UsernameDiscriminatorOrEmail);
 			} else {
@@ -142,9 +145,21 @@ public class Server : MonoBehaviour {
 
 
 	private void ResponseFollowList(RequestMsg_FollowList msg, int hostId, int connectionId) {
-		SendToClient(hostId, connectionId, new ResponseMsg_FollowList(MessageEnums.Status.OK, mongo.SelectAllAccountsInfo(msg.Token)));
+		SendToClient(hostId, connectionId, new ResponseMsg_FollowList(MessageEnums.Status.OK, mongo.SelectAllPublicInfoForInitiator(msg.Token)));
 	}
 
+	private void OnDisconnected(int recHostId, int connectionId) {
+		// log out
+		PublicInfo disconnectedAccountPublicInfo = mongo.ClearAccount(connectionId);
+		// update the followers
+		UpdateFollowers(disconnectedAccountPublicInfo);
+	}
+
+	private void UpdateFollowers(PublicInfo updatedInfo) {
+		foreach (var followersAccount in mongo.SelectAllAccountForTarget(updatedInfo.Email)) {
+			SendToClient(followersAccount.HostId, followersAccount.ConnectionId, new ResponseMsg_FollowUpdate(updatedInfo));
+		}
+	}
 	#endregion
 
 	#region Receive Data

@@ -47,11 +47,11 @@ public class Mongo {
 		return MessageEnums.Status.OK;
 	}
 
-	public Info InsertFollowership(string token, string email) { return InsertFollowership(token, SelectAccount(email, a => a.Email)); }
+	public PublicInfo InsertFollowership(string token, string email) { return InsertFollowership(token, SelectAccount(email, a => a.Email)); }
 
-	public Info InsertFollowership(string token, string username, string discriminator) { return InsertFollowership(token, SelectAccount(username, discriminator)); }
+	public PublicInfo InsertFollowership(string token, string username, string discriminator) { return InsertFollowership(token, SelectAccount(username, discriminator)); }
 
-	private Info InsertFollowership(string token, Account account) {
+	private PublicInfo InsertFollowership(string token, Account account) {
 		if (account == null)
 			return null;
 		Followership followership = new Followership(new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id), new MongoDBRef(ACCOUNTS_COLLECTION_NAME, account._id));
@@ -60,12 +60,12 @@ public class Mongo {
 		var query = Query.And(Query<Followership>.EQ(f => f.Target, followership.Target), Query<Followership>.EQ(f => f.Initiator, followership.Initiator));
 		if (followershippCollection.FindOne(query) == null)
 			followershippCollection.Insert(query);
-		return account.GetInfo();
+		return account.GetPublicInfo();
 	}
 	#endregion
 
 	#region Update
-	public Account LogIn(string usernameOrEmail, string password, int connectionId, string token) {
+	public Account LogIn(string usernameOrEmail, string password, int hostId, int connectionId, string token) {
 		Account account = null;
 		string[] data = usernameOrEmail.Split('#');
 
@@ -75,13 +75,33 @@ public class Mongo {
 			account = SelectAccountWithPassword(usernameOrEmail, password);
 
 		if (account != null) {
-			account.ActiveConnection = connectionId;
+			account.HostId = hostId;
 			account.Token = token;
-			account.Status = MessageEnums.Status.LoggedIn;
-			account.LastLogin = DateTime.Now;
+			account.ConnectionId = connectionId;
+			account.Status = MessageEnums.AccountStatus.Online;
+			account.LastSeen = DateTime.Now;
 			accountsCollection.Update(Query<Account>.EQ(a => a.Email, account.Email), Update<Account>.Replace(account));
 		}
 		return account;
+	}
+
+	public PublicInfo ClearAccount(int connectionId) {
+		Account account = SelectAccount(connectionId, a => a.ConnectionId);
+		if (account == null)
+			return null;
+		account.Token = null;
+		account.ConnectionId = 0; // nobody is ever on 0, when it starts it does that from 1, never 0
+		account.Status = MessageEnums.AccountStatus.Offline;
+		account.LastSeen = DateTime.Now;
+		accountsCollection.Update(Query<Account>.EQ(a => a.Email, account.Email), Update<Account>.Replace(account));
+		return account.GetPublicInfo();
+	}
+
+	public void UpdateDisconnected(int connectionId) {
+		// connectionId: nobody is ever on 0, when it starts it does that from 1, never 0
+		var update = Update<Account>.Set(a => a.Token, null).Set(a => a.ConnectionId, 0).Set(a => a.Status, MessageEnums.AccountStatus.Offline);
+		var query = Query<Account>.EQ(a => a.ConnectionId, connectionId);
+		accountsCollection.Update(query, update);
 	}
 	#endregion
 
@@ -92,15 +112,34 @@ public class Mongo {
 	public Account SelectAccount(string Username, string Discriminator) { return accountsCollection.FindOne(Query.And(Query<Account>.EQ(account => account.Username, Username), Query<Account>.EQ(account => account.Discriminator, Discriminator))); }
 	public Account SelectAccount<T>(T withThis, Expression<Func<Account, T>> byThis) { return accountsCollection.FindOne(Query<Account>.EQ(byThis, withThis)); }
 
-	public List<Info> SelectAllAccountsInfo(string token) {
-		List<Info> result = new List<Info>();
+	public List<PublicInfo> SelectAllPublicInfoForInitiator(string token) {
+		List<PublicInfo> result = new List<PublicInfo>();
 		var initiator = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id);
 		var queryOfAllFollowershipsWithThisInitiator = Query<Followership>.EQ(f => f.Initiator, initiator);
 		foreach (var followership in followershippCollection.Find(queryOfAllFollowershipsWithThisInitiator)) {
-			result.Add(SelectAccount(followership.Target.Id.AsObjectId, a => a._id).GetInfo());
+			result.Add(SelectAccount(followership.Target.Id.AsObjectId, a => a._id).GetPublicInfo());
 		}
 		return result;
 	}
+
+	public List<Account> SelectAllAccountForTarget(string email) {
+		List<Account> result = new List<Account>();
+		var target = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(email, a => a.Email)._id);
+		var queryOfAllFollowershipsWithThisTarget = Query<Followership>.EQ(f => f.Target, target);
+		foreach (var followership in followershippCollection.Find(queryOfAllFollowershipsWithThisTarget)) {
+			result.Add(SelectAccount(followership.Initiator.Id.AsObjectId, a => a._id));
+		}
+		return result;
+	}
+
+	//public List<Account> SelectAllAccountsByFollowership(string token, Expression<Func<Followership, MongoDBRef>> expressionFrom, Func<Followership, MongoDBRef> functionTo) {
+	//	List<Account> result = new List<Account>();
+	//	var query = Query<Followership>.EQ(expressionFrom, new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id));
+	//	foreach (var followership in followershippCollection.Find(query)) {
+	//		result.Add(SelectAccount(functionTo(followership).Id.AsObjectId, a => a._id));
+	//	}
+	//	return result;
+	//}
 
 	#endregion
 
