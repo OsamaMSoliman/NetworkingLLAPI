@@ -137,6 +137,9 @@ public class Client : MonoBehaviour {
 			case MessageEnums.OperationCode.FollowAddRemoveResponse:
 				OnFollowResponse((ResponseMsg_FollowAddRemove)msg);
 				break;
+			case MessageEnums.OperationCode.FollowListResponse:
+				OnFollowListResponse((ResponseMsg_FollowList)msg);
+				break;
 			default:
 				break;
 		}
@@ -144,6 +147,9 @@ public class Client : MonoBehaviour {
 
 	public event Action<ResponseMsg_FollowAddRemove> FollowResponseReceived;
 	private void OnFollowResponse(ResponseMsg_FollowAddRemove msg) => FollowResponseReceived?.Invoke(msg);
+
+	public event Action<ResponseMsg_FollowList> FollowListResponseReceived;
+	private void OnFollowListResponse(ResponseMsg_FollowList msg) => FollowListResponseReceived?.Invoke(msg);
 
 	public event Action<ResponseMsg_CreateAccount> CreateAccountResponseReceived;
 	private void OnCreateAccountResponse(ResponseMsg_CreateAccount msg) => CreateAccountResponseReceived?.Invoke(msg);
@@ -193,25 +199,7 @@ public class Client : MonoBehaviour {
 	}
 
 
-	public void RequestAddRemoveFollow(bool unFollow, string UsernameDiscriminatorOrEmail) {
-		Utilities.StringTpye x = Utilities.TestString(UsernameDiscriminatorOrEmail);
-		switch (x) {
-			case Utilities.StringTpye.UsernameAndDiscriminator:
-				if (UsernameDiscriminatorOrEmail != Info.Username + '#' + Info.Discriminator)
-					SendToServer(new RequestMsg_FollowAddRemove(unFollow, Token, UsernameDiscriminatorOrEmail, false));
-				break;
-			case Utilities.StringTpye.Email:
-				if (UsernameDiscriminatorOrEmail != Info.Email)
-					SendToServer(new RequestMsg_FollowAddRemove(unFollow, Token, UsernameDiscriminatorOrEmail, true));
-				break;
-
-			default:
-			case Utilities.StringTpye.Username:
-			case Utilities.StringTpye.Undefined:
-				//TODO: ERROR!
-				break;
-		}
-	}
+	public void RequestAddRemoveFollow(bool unFollow, string UsernameDiscriminatorOrEmail, Utilities.StringTpye type) => SendToServer(new RequestMsg_FollowAddRemove(unFollow, Token, UsernameDiscriminatorOrEmail, type == Utilities.StringTpye.Email));
 
 
 	public void RequestListOfFollows() => SendToServer(new RequestMsg_FollowList(Token));

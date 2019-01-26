@@ -1,5 +1,8 @@
 ﻿using MongoDB.Driver;
 using MongoDB.Driver.Builders;
+using System;
+using System.Collections.Generic;
+using System.Linq.Expressions;
 
 public class Mongo {
 	private const string MONGO_URI = "mongodb://server:server1@ds163054.mlab.com:63054/lobbydb";
@@ -20,7 +23,7 @@ public class Mongo {
 			accountsCollection = mongoDb.GetCollection<Account>(ACCOUNTS_COLLECTION_NAME);
 			followershippCollection = mongoDb.GetCollection<Followership>(FOLLOWERSHIP_COLLECTION_NAME);
 			return true;
-		} catch (System.Exception) { return false; }
+		} catch (Exception) { return false; }
 	}
 
 	public void Shutdown() {
@@ -75,7 +78,7 @@ public class Mongo {
 			account.ActiveConnection = connectionId;
 			account.Token = token;
 			account.Status = MessageEnums.Status.LoggedIn;
-			account.LastLogin = System.DateTime.Now;
+			account.LastLogin = DateTime.Now;
 			accountsCollection.Update(Query<Account>.EQ(a => a.Email, account.Email), Update<Account>.Replace(account));
 		}
 		return account;
@@ -87,22 +90,32 @@ public class Mongo {
 	public Account SelectAccountWithPassword(string username, string discriminator, string password) { return accountsCollection.FindOne(Query.And(Query<Account>.EQ(account => account.Username, username), Query<Account>.EQ(account => account.Discriminator, discriminator), Query<Account>.EQ(account => account.Password, password))); }
 
 	public Account SelectAccount(string Username, string Discriminator) { return accountsCollection.FindOne(Query.And(Query<Account>.EQ(account => account.Username, Username), Query<Account>.EQ(account => account.Discriminator, Discriminator))); }
-	public Account SelectAccount(string withThis, System.Linq.Expressions.Expression<System.Func<Account, string>> byThis) { return accountsCollection.FindOne(Query<Account>.EQ(byThis, withThis)); }
+	public Account SelectAccount<T>(T withThis, Expression<Func<Account, T>> byThis) { return accountsCollection.FindOne(Query<Account>.EQ(byThis, withThis)); }
+
+	public List<Info> SelectAllAccountsInfo(string token) {
+		List<Info> result = new List<Info>();
+		var initiator = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id);
+		var queryOfAllFollowershipsWithThisInitiator = Query<Followership>.EQ(f => f.Initiator, initiator);
+		foreach (var followership in followershippCollection.Find(queryOfAllFollowershipsWithThisInitiator)) {
+			result.Add(SelectAccount(followership.Target.Id.AsObjectId, a => a._id).GetInfo());
+		}
+		return result;
+	}
+
 	#endregion
 
 	#region Delete
-	public string DeleteFollowerShip(string token, string email) { return DeleteFollowerShip(token, SelectAccount(email, a => a.Email)); }
+	public void DeleteFollowerShip(string token, string email) { DeleteFollowerShip(token, SelectAccount(email, a => a.Email)); }
 
-	public string DeleteFollowerShip(string token, string username, string discriminator) { return DeleteFollowerShip(token, SelectAccount(username, discriminator)); }
+	public void DeleteFollowerShip(string token, string username, string discriminator) { DeleteFollowerShip(token, SelectAccount(username, discriminator)); }
 
-	private string DeleteFollowerShip(string token, Account account) {
+	private void DeleteFollowerShip(string token, Account account) {
 		if (account == null)
-			return "NONE";
+			return;
 		var Initiator = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id);
 		var Target = new MongoDBRef(ACCOUNTS_COLLECTION_NAME, account._id);
 		Followership followership = followershippCollection.FindOne(Query.And(Query<Followership>.EQ(f => f.Initiator, Initiator), Query<Followership>.EQ(f => f.Target, Target)));
 		followershippCollection.Remove(Query<Followership>.EQ(f => f._id, followership._id));
-		return followership.ToString();
 	}
 	#endregion
 }

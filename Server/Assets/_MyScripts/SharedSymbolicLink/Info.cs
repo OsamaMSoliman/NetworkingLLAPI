@@ -16,14 +16,20 @@ public class Info {
 		}
 	}
 
-	public Info(int activeConnection, string username, string discriminator, MessageEnums.Status status) {
+	public Info(int activeConnection, string username, string discriminator, string email, MessageEnums.Status status) {
 		this.ActiveConnection = activeConnection;
 		this.Username = username;
 		this.Discriminator = discriminator;
+		this.Email = email;
 		this.Status = status;
 	}
 
-	public override string ToString() {
-		return string.Format("ActiveConnection: {0}, Username: {1}, Discriminator: {2}, Email: {3}, Status: {4}", ActiveConnection, Username, Discriminator, Email, Status);
+	public override string ToString() { return string.Format("ActiveConnection: {0}, Username: {1}, Discriminator: {2}, Email: {3}, Status: {4}", ActiveConnection, Username, Discriminator, Email, Status); }
+
+	public override bool Equals(object obj) {
+		Info info = obj as Info;
+		if (info == null)
+			return false;
+		return this.Email == info.Email || this.Username + '#' + this.Discriminator == info.Username + '#' + info.Discriminator;
 	}
 }

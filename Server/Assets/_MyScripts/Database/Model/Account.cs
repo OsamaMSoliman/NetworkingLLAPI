@@ -20,6 +20,6 @@
 	public System.DateTime LastLogin { get; set; }
 
 
-	public Info GetInfo() { return new Info(this.ActiveConnection, this.Username, this.Discriminator, this.Status); }
+	public Info GetInfo() { return new Info(this.ActiveConnection, this.Username, this.Discriminator, this.Email, this.Status); }
 
 }

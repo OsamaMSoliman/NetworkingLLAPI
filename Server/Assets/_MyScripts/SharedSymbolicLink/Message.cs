@@ -20,6 +20,7 @@ public static class MessageEnums {
 
 
 	//TODO: turn status into a bool Success or Failed
+	//TODO: check all the Status msgs in both Server how are they assigned and Client how are they checked
 	public enum Status : byte {
 		OK = 1,
 		InvalidEmail,
@@ -29,6 +30,7 @@ public static class MessageEnums {
 		FollowAdded,
 		FollowRemoved,
 		FollowListUpdated,
+		LoggedOut,
 	}
 }
 
@@ -133,11 +135,11 @@ public class RequestMsg_FollowList : Message {
 [Serializable]
 public class ResponseMsg_FollowList : Message {
 	public MessageEnums.Status Status { get; set; }
-	public System.Collections.Generic.List<Info> Follow { get; private set; }
+	public System.Collections.Generic.List<Info> Follows { get; private set; }
 
 	public ResponseMsg_FollowList(MessageEnums.Status status, System.Collections.Generic.List<Info> follow) {
 		op = MessageEnums.OperationCode.FollowListResponse;
 		this.Status = status;
-		this.Follow = follow;
+		this.Follows = follow;
 	}
 }

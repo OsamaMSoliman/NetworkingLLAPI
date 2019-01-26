@@ -123,10 +123,10 @@ public class Server : MonoBehaviour {
 	private void ResponseFollowAddRemove(RequestMsg_FollowAddRemove msg, int hostId, int connectionId) {
 		if (msg.Unfollow) {
 			if (msg.IsEmail) {
-				print(mongo.DeleteFollowerShip(msg.Token, msg.UsernameDiscriminatorOrEmail));
+				mongo.DeleteFollowerShip(msg.Token, msg.UsernameDiscriminatorOrEmail);
 			} else {
 				string[] data = msg.UsernameDiscriminatorOrEmail.Split(new char[] { '#' }, System.StringSplitOptions.RemoveEmptyEntries);
-				print(mongo.DeleteFollowerShip(msg.Token, data[0], data[1]));
+				mongo.DeleteFollowerShip(msg.Token, data[0], data[1]);
 			}
 		} else {
 			Info info = null;
@@ -142,8 +142,9 @@ public class Server : MonoBehaviour {
 
 
 	private void ResponseFollowList(RequestMsg_FollowList msg, int hostId, int connectionId) {
-
+		SendToClient(hostId, connectionId, new ResponseMsg_FollowList(MessageEnums.Status.OK, mongo.SelectAllAccountsInfo(msg.Token)));
 	}
+
 	#endregion
 
 	#region Receive Data
