@@ -36,9 +36,7 @@ public class HUBCanvas : MonoBehaviour {
 		Client.Self.FollowListResponseReceived -= OnFollowListResponse;
 	}
 
-	private void FollowUpdate(ResponseMsg_FollowUpdate msg) {
-		//TODO: update the UI
-	}
+	private void FollowUpdate(ResponseMsg_FollowUpdate msg) => followInfoDic[msg.Follow.Email].goRef.GetComponentInChildren<Image>().color = msg.Follow.Status == MessageEnums.AccountStatus.Online ? Color.green : Color.grey;
 
 
 	private void AddToFollowList(PublicInfo follow) {

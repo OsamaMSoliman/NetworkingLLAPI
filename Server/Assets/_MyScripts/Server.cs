@@ -114,13 +114,10 @@ public class Server : MonoBehaviour {
 		string[] data = msg.EmailOrUsername.Split('#');
 		string token = Utilities.GenerateRandom(64);
 		Account account = mongo.LogIn(msg.EmailOrUsername, msg.Password, hostId, connectionId, token);
-		print(">>>>>>>>> " + account.ToString());
-		if (account == null)
-			return; // TODO: Must return a response
-		ResponseMsg_Login response = new ResponseMsg_Login(MessageEnums.Status.OK, account.Username, account.Discriminator, account.Token);
-		response.Email = account.Email;
+		ResponseMsg_Login response = account == null ? new ResponseMsg_Login(MessageEnums.Status.AccountDoesntExist, null) : new ResponseMsg_Login(MessageEnums.Status.OK, account);
 		SendToClient(hostId, connectionId, response);
-		UpdateFollowers(account.GetPublicInfo());
+		if (account != null)
+			UpdateFollowers(account.GetPublicInfo());
 	}
 
 	private void ResponseFollowAddRemove(RequestMsg_FollowAddRemove msg, int hostId, int connectionId) {
@@ -145,14 +142,18 @@ public class Server : MonoBehaviour {
 
 
 	private void ResponseFollowList(RequestMsg_FollowList msg, int hostId, int connectionId) {
-		SendToClient(hostId, connectionId, new ResponseMsg_FollowList(MessageEnums.Status.OK, mongo.SelectAllPublicInfoForInitiator(msg.Token)));
+		var followList = mongo.SelectAllPublicInfoForInitiator(msg.Token);
+		if (followList.Count > 0) // no need to send empty/meaningless msg of the network
+			SendToClient(hostId, connectionId, new ResponseMsg_FollowList(MessageEnums.Status.OK, followList));
 	}
 
 	private void OnDisconnected(int recHostId, int connectionId) {
 		// log out
 		PublicInfo disconnectedAccountPublicInfo = mongo.ClearAccount(connectionId);
-		// update the followers
-		UpdateFollowers(disconnectedAccountPublicInfo);
+		// if connected but didn't login
+		if (disconnectedAccountPublicInfo != null)
+			// update the followers
+			UpdateFollowers(disconnectedAccountPublicInfo);
 	}
 
 	private void UpdateFollowers(PublicInfo updatedInfo) {
@@ -184,16 +185,4 @@ public class Server : MonoBehaviour {
 		}
 	}
 	#endregion
-
-	#region Token Management
-	private string GetUniqueToken() {
-		//TODO: hold all the tokens and compare the new one with them and return if Unique
-		return null;
-	}
-	private void AddToken() {
-		//TODO:
-	}
-	#endregion
-
-
 }

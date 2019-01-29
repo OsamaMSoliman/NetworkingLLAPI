@@ -43,7 +43,7 @@ public class Mongo {
 		if (SelectAccount(email, a => a.Email) != null)
 			return MessageEnums.Status.EmailAlreayExists;
 
-		accountsCollection.Insert(new Account(username, password, email, accountsCollection.Count().ToString("0000")));
+		accountsCollection.Insert(new Account(username, password, email, CountAllAccountsWithThisUsername(username).ToString("0000")));
 		return MessageEnums.Status.OK;
 	}
 
@@ -53,10 +53,10 @@ public class Mongo {
 
 	private PublicInfo InsertFollowership(string token, Account account) {
 		if (account == null)
-			return null;
+			return null;//just in case (can't think of a possile way where token is null and requesting to follow someone)
 		Followership followership = new Followership(new MongoDBRef(ACCOUNTS_COLLECTION_NAME, SelectAccount(token, a => a.Token)._id), new MongoDBRef(ACCOUNTS_COLLECTION_NAME, account._id));
 		if (followership.Initiator == followership.Target)
-			return null;
+			return null;//just in case (checked already on the client side)
 		var query = Query.And(Query<Followership>.EQ(f => f.Target, followership.Target), Query<Followership>.EQ(f => f.Initiator, followership.Initiator));
 		if (followershippCollection.FindOne(query) == null)
 			followershippCollection.Insert(query);
@@ -111,6 +111,7 @@ public class Mongo {
 
 	public Account SelectAccount(string Username, string Discriminator) { return accountsCollection.FindOne(Query.And(Query<Account>.EQ(account => account.Username, Username), Query<Account>.EQ(account => account.Discriminator, Discriminator))); }
 	public Account SelectAccount<T>(T withThis, Expression<Func<Account, T>> byThis) { return accountsCollection.FindOne(Query<Account>.EQ(byThis, withThis)); }
+	public long CountAllAccountsWithThisUsername(string username) { return accountsCollection.Count(Query<Account>.EQ(a => a.Username, username)); }
 
 	public List<PublicInfo> SelectAllPublicInfoForInitiator(string token) {
 		List<PublicInfo> result = new List<PublicInfo>();

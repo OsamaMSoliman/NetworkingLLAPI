@@ -21,15 +21,15 @@ public static class MessageEnums {
 	}
 
 
-	//TODO: check all the Status msgs in both Server how are they assigned and Client how are they checked
 	public enum Status : byte {
-		ERROR, // TODO: this is a placeholder, all errors should be identified in the last version
+		ERROR, // ~ TODO: this is a placeholder, all errors should be identified in the last version ~
 		OK,
 		InvalidEmail,
 		InvalidUsername,
 		EmailAlreayExists,
 		FollowAdded,
 		FollowRemoved,
+		AccountDoesntExist,
 	}
 
 	public enum AccountStatus : byte {
@@ -63,7 +63,7 @@ public class RequestMsg_CreateAccount : Message {
 
 [Serializable]
 public class ResponseMsg_CreateAccount : Message {
-	public MessageEnums.Status Status { get; set; }
+	public MessageEnums.Status Status { get; private set; }
 	public ResponseMsg_CreateAccount(MessageEnums.Status status) {
 		op = MessageEnums.OperationCode.CreateAccountResponse;
 		this.Status = status;
@@ -84,18 +84,21 @@ public class RequestMsg_Login : Message {
 
 [Serializable]
 public class ResponseMsg_Login : Message {
-	public MessageEnums.Status Status { get; set; }
+	public MessageEnums.Status Status { get; private set; }
 	public string Username { get; private set; }
 	public string Discriminator { get; private set; }
 	public string Token { get; private set; }
-	public string Email { get; set; }
+	public string Email { get; private set; }
 
-	public ResponseMsg_Login(MessageEnums.Status status, string username, string discremenator, string token) {
+	public ResponseMsg_Login(MessageEnums.Status Status, Account account) {
 		op = MessageEnums.OperationCode.LoginResponse;
-		this.Status = status;
-		this.Username = username;
-		this.Discriminator = discremenator;
-		this.Token = token;
+		this.Status = Status;
+		if (Status != MessageEnums.Status.OK)
+			return;
+		this.Username = account.Username;
+		this.Discriminator = account.Discriminator;
+		this.Token = account.Token;
+		this.Email = account.Email;
 	}
 }
 
@@ -117,7 +120,7 @@ public class RequestMsg_FollowAddRemove : Message {
 
 [Serializable]
 public class ResponseMsg_FollowAddRemove : Message {
-	public MessageEnums.Status Status { get; set; }
+	public MessageEnums.Status Status { get; private set; } // Not utilized, onAdd status = OK | onRemove no msg sent to begin with
 	public PublicInfo Follow { get; private set; }
 
 	public ResponseMsg_FollowAddRemove(MessageEnums.Status status, PublicInfo follow) {
@@ -140,7 +143,7 @@ public class RequestMsg_FollowList : Message {
 
 [Serializable]
 public class ResponseMsg_FollowList : Message {
-	public MessageEnums.Status Status { get; set; }
+	public MessageEnums.Status Status { get; private set; }// redundant as the server won't send the msg if the Follows list was empty
 	public List<PublicInfo> Follows { get; private set; }
 
 	public ResponseMsg_FollowList(MessageEnums.Status status, List<PublicInfo> follows) {
@@ -152,6 +155,7 @@ public class ResponseMsg_FollowList : Message {
 
 [Serializable]
 public class ResponseMsg_FollowUpdate : Message {
+	//public MessageEnums.Status Status { get; private set; } // redundant as the server is the one who process the msg (internally not needed, easier to check for null and not sending)
 	public PublicInfo Follow { get; private set; }
 
 	public ResponseMsg_FollowUpdate(PublicInfo follow) {
